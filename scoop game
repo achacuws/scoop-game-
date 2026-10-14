@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scoop Order Bead Game</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #fce4ec;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+        h1 { color: #ad1457; margin-bottom: 5px; }
+        .stats {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #880e4f;
+        }
+        .game-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 800px;
+        }
+        .box {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            width: 240px;
+            min-height: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .bead-pool, .inventory, .order-box {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            width: 100%;
+            min-height: 100px;
+            background: #fff5f8;
+            border: 2px dashed #f48fb1;
+            border-radius: 8px;
+            padding: 10px;
+            box-sizing: border-box;
+            align-content: flex-start;
+        }
+        .bead {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: inset -2px -2px 4px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        .red { background-color: #ff5252; }
+        .blue { background-color: #448aff; }
+        .yellow { background-color: #ffd740; }
+        .purple { background-color: #e040fb; }
+
+        button {
+            background-color: #ec407a;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 10px;
+        }
+        button:hover { background-color: #d81b60; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <h1>✨ Scoop Order Shop ✨</h1>
+    <div class="stats">Uang: $<span id="money">0</span></div>
+
+    <div class="game-container">
+        <!-- WADAH UTAMA -->
+        <div class="box">
+            <h3>Wadah Manik</h3>
+            <button id="scoop-btn" onclick="scoopBeads()">🥄 Scoop (Serok)!</button>
+            <div id="scoop-result" class="bead-pool"></div>
+        </div>
+
+        <!-- PESANAN PELANGGAN -->
+        <div class="box">
+            <h3>Pesanan Pelanggan</h3>
+            <div id="order-req">Klik "Cari Pesanan"</div>
+            <div id="order-box" class="order-box"></div>
+            <button id="sell-btn" onclick="fulfillOrder()" disabled>Kirim Pesanan ($<span id="order-reward">0</span>)</button>
+            <button onclick="generateOrder()" style="background-color: #7c4dff;">Cari Pesanan Baru</button>
+        </div>
+
+        <!-- INVENTARIS/PENYIMPANAN -->
+        <div class="box">
+            <h3>Penyimpanan Kamu</h3>
+            <p style="font-size: 0.8rem; color: #666;">Klik manik di wadah serok untuk menyimpan, atau klik di sini untuk memasukkan ke pesanan.</p>
+            <div id="inventory" class="inventory"></div>
+        </div>
+    </div>
+
+    <script>
+        let money = 0;
+        const colors = ['red', 'blue', 'yellow', 'purple'];
+        let currentScoop = [];
+        let inventory = [];
+        let currentOrder = {};
+
+        function scoopBeads() {
+            currentScoop = [];
+            const scoopContainer = document.getElementById('scoop-result');
+            scoopContainer.innerHTML = '';
+            
+            // Ambil 5-8 manik secara acak
+            const count = Math.floor(Math.random() * 4) + 5;
+            for (let i = 0; i < count; i++) {
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                currentScoop.push(randomColor);
+            }
+            renderScoop();
+        }
+
+        function renderScoop() {
+            const container = document.getElementById('scoop-result');
+            container.innerHTML = '';
+            currentScoop.forEach((color, index) => {
+                const bead = document.createElement('div');
+                bead.className = `bead ${color}`;
+                bead.onclick = () => moveToInventory(index);
+                container.appendChild(bead);
+            });
+        }
+
+        function moveToInventory(index) {
+            const color = currentScoop.splice(index, 1)[0];
+            inventory.push(color);
+            renderScoop();
+            renderInventory();
+        }
+
+        function renderInventory() {
+            const container = document.getElementById('inventory');
+            container.innerHTML = '';
+            inventory.forEach((color, index) => {
+                const bead = document.createElement('div');
+                bead.className = `bead ${color}`;
+                bead.onclick = () => useBeadForOrder(index);
+                container.appendChild(bead);
+            });
+        }
+
+        function generateOrder() {
+            currentOrder = {
+                red: Math.floor(Math.random() * 3),
+                blue: Math.floor(Math.random() * 3),
+                yellow: Math.floor(Math.random() * 3),
+                purple: Math.floor(Math.random() * 3)
+            };
+            
+            // Pastikan minimal ada 1 item yang dipesan
+            if (Object.values(currentOrder).reduce((a, b) => a + b, 0) === 0) {
+                currentOrder.red = 2;
+            }
+
+            let reqText = "Butuh: ";
+            let reward = 0;
+            for (let color in currentOrder) {
+                if (currentOrder[color] > 0) {
+                    reqText += `${currentOrder[color]} ${color.toUpperCase()}, `;
+                    reward += currentOrder[color] * 10;
+                }
+            }
+            
+            document.getElementById('order-req').innerText = reqText.slice(0, -2);
+            document.getElementById('order-reward').innerText = reward;
+            document.getElementById('order-box').innerHTML = '';
+            checkOrderComplete();
+        }
+
+        function useBeadForOrder(invIndex) {
+            const color = inventory[invIndex];
+            
+            // Cek apakah warna ini dibutuhkan di pesanan
+            const currentFilled = document.querySelectorAll(`#order-box .${color}`).length;
+            if (currentOrder[color] && currentFilled < currentOrder[color]) {
+                inventory.splice(invIndex, 1);
+                renderInventory();
+
+                const bead = document.createElement('div');
+                bead.className = `bead ${color}`;
+                document.getElementById('order-box').appendChild(bead);
+
+                checkOrderComplete();
+            } else {
+                alert("Warna ini tidak dibutuhkan atau jumlahnya sudah cukup!");
+            }
+        }
+
+        function checkOrderComplete() {
+            let complete = true;
+            for (let color in currentOrder) {
+                const count = document.querySelectorAll(`#order-box .${color}`).length;
+                if (count < currentOrder[color]) {
+                    complete = false;
+                    break;
+                }
+            }
+            document.getElementById('sell-btn').disabled = !complete;
+        }
+
+        function fulfillOrder() {
+            const reward = parseInt(document.getElementById('order-reward').innerText);
+            money += reward;
+            document.getElementById('money').innerText = money;
+            document.getElementById('order-box').innerHTML = '';
+            document.getElementById('order-req').innerText = 'Pesanan selesai! Cari pesanan baru.';
+            document.getElementById('sell-btn').disabled = true;
+            currentOrder = {};
+        }
+    </script>
+</body>
+</html>
